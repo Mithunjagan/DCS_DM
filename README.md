@@ -134,6 +134,79 @@ That is why **128 wins**. It is large enough to chase the sine, but small enough
 
 ---
 
+## Visual evidence — from simulation to a live FPGA
+
+The images below tell the project story in engineering order. They are not decorative screenshots: each one corresponds to a verification stage that a reviewer can reproduce from the supplied source, project files, and bitstream.
+
+### 1. Behavioral simulation: prove the codec before hardware
+
+![Behavioral simulation waveform showing the input, encoder staircase, decoded output, filtered output, and one-bit stream.](docs/images/01-behavioral-simulation-waveform.png)
+
+**Figure 1 — XSIM behavioral verification of the Delta Modulation chain.** The sine input `x` is compared with the encoder staircase `y_enc`; the decoder recreates the staircase as `y_dec_stair`, while `y_dec` is the smoother low-pass-filtered result. The visible one-bit `dm_bit` track confirms that the waveform is represented by successive UP/DOWN decisions rather than by a multi-bit sample word. This is the first validation gate: it confirms the functional algorithm before synthesis or board programming.
+
+### 2. Synthesized hierarchy: prove that the HDL became hardware
+
+![Vivado synthesized-design schematic with the sine generator, delta modulator, delta demodulator, debug hub, and ILA.](docs/images/05-synthesized-design-schematic.png)
+
+**Figure 2 — Vivado synthesized design schematic.** The netlist exposes the expected `dm_top` hierarchy: `u_sine` generates the test input, `u_mod` performs one-bit delta encoding, and `u_demod` reconstructs and filters the received stream. The `u_ila_0` and debug hub are also present, showing that the internal debug probes were retained through synthesis rather than being optimized away.
+
+### 3. Device/package planning: connect the design to the XC7Z020
+
+![Vivado package view for the XC7Z020 ZedBoard device.](docs/images/02-device-package-view.png)
+
+**Figure 3 — XC7Z020 package/device view in Vivado.** This view is used while validating the physical device context of the design and the package-pin relationship behind the XDC constraints. The project targets the ZedBoard’s `xc7z020clg484-1`; the companion `zedboard_dm.xdc` assigns the board clock, reset button, switches, LEDs, and Pmod outputs to this package.
+
+### 4. Implemented floorplan: place the logic on the FPGA fabric
+
+![Vivado implemented device floorplan showing placed design resources on the XC7Z020 fabric.](docs/images/03-implemented-device-floorplan.png)
+
+**Figure 4 — Implemented device floorplan.** After placement and routing, Vivado maps the codec and debug resources into the XC7Z020 programmable fabric. The highlighted region demonstrates that this is a physically implemented design, not only an RTL simulation. Timing, route-status, and utilization reports in `DCS/delta/delta.runs/impl_1/` provide the numerical evidence that accompanies this view.
+
+### 5. Hardware Manager: program and observe the real board
+
+![Vivado Hardware Manager connected to the programmed XC7Z020 and its ILA debug core.](docs/images/04-hardware-manager-ila-armed.png)
+
+**Figure 5 — Live hardware connection and ILA availability.** Vivado Hardware Manager recognizes the programmed `xc7z020_1` device and the inserted `u_ila_0` core. The visible probes (`dbg_err`, `dbg_yenc`, `dbg_x`, `dbg_ydec`, and `dbg_bit`) are the same signals that appear in the HDL. This closes the loop between source code, generated bitstream, and board-level observation.
+
+### 6. Step-size experiment: watch the theory change the waveform
+
+The following four captures are arranged by increasing delta step. They are the strongest visual evidence of the project’s central argument: the step size trades tracking speed against quantization granularity.
+
+#### `delta = 16` — severe slope overload
+
+![ILA waveform for delta 16 showing a triangular encoder staircase that cannot track the sine input.](docs/images/06-ila-delta-16-severe-overload.png)
+
+**Figure 6 — Severe slope overload (`delta = 16`).** The input sine `dbg_x` changes much faster than the encoder estimate `dbg_yenc` can move. The encoder staircase therefore becomes a long triangular ramp, and the error `dbg_err` grows large; at the shown cursor, the input is approximately `-6811` while the encoder staircase is about `-1056`. Long runs of the same `dbg_bit` value are the expected signature of an undersized step.
+
+#### `delta = 64` — improved, but still slope limited
+
+![ILA waveform for delta 64 showing improved but still insufficient encoder tracking.](docs/images/07-ila-delta-64-mild-overload.png)
+
+**Figure 7 — Mild slope overload (`delta = 64`).** Increasing the step improves the encoder response, but the staircase still cannot fully follow the steepest portions of the sine. The tracking error is smaller than the `delta = 16` case but remains visibly significant; this is the intended intermediate demonstration between failure and correct operation.
+
+#### `delta = 128` — nominal tracking point
+
+![ILA waveform for delta 128 showing close alignment between input and encoder staircase.](docs/images/08-ila-delta-128-nominal-tracking.png)
+
+**Figure 8 — Nominal operating point (`delta = 128`).** This is the design-point capture. At the cursor, `dbg_x` is `8034` and `dbg_yenc` is `7936`, giving a small displayed encoder error of `0x0062` (98 decimal). The filtered decoder output `dbg_ydec` remains slightly delayed, as expected from the IIR low-pass filter, but follows the input cleanly. This agrees with the derived minimum step of approximately `102.94`.
+
+#### `delta = 512` — granular-noise regime
+
+![ILA waveform for delta 512 showing coarse staircase behavior and the one-bit delta stream.](docs/images/09-ila-delta-512-granular-noise.png)
+
+**Figure 9 — Granular-noise regime (`delta = 512`).** The large step prevents slope overload, but each correction is coarse. The encoder can still be close to the input at individual cursor locations, yet it reaches that value through larger jumps and requires fewer, more abrupt direction changes. The IIR filter smooths some of the resulting high-frequency staircase energy, while the raw bit/staircase behavior demonstrates why an oversized fixed step is not the best fidelity choice.
+
+### How to use these figures in a report or presentation
+
+1. Start with Figure 1 to explain the signal names and algorithm.
+2. Use Figures 2–5 to establish that the project was synthesized, implemented, programmed, and debugged on the target FPGA.
+3. Present Figures 6–9 together as the experimental result: `16 → 64 → 128 → 512` transitions from severe overload to mild overload, correct tracking, and granular noise.
+4. Pair Figure 8 with the slope-limit equation; pair Figure 9 with the discussion of quantization/granular noise.
+
+> These screenshots were captured from Vivado/XSIM and Vivado Hardware Manager. For an academic submission, preserve the figure order and use the captions above; add a board photograph and RC-filter oscilloscope trace if available.
+
+---
+
 ## Run it anywhere — choose your path
 
 | You have... | Best path | What you get |
