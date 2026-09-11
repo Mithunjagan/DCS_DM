@@ -5,11 +5,11 @@
 //   dm_out.csv  ->  open it in Excel / Python and plot the columns.
 //   Change DELTA below to demonstrate slope overload / granular noise.
 //======================================================================
-module tb_dm;
-
-    localparam integer W        = 16;
-    localparam integer N        = 4096;          // samples to capture
-    localparam signed [15:0] DELTA = 16'sd128;   // try 16, 64, 128, 512
+module tb_dm #(
+    parameter integer W = 16,
+    parameter integer N = 4096,                  // samples to capture
+    parameter signed [15:0] DELTA = 16'sd128     // try 16, 64, 128, 512
+);
 
     reg clk = 0, rst = 1;
     always #10 clk = ~clk;                       // 50 MHz "sample clock"

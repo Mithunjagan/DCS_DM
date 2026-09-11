@@ -134,49 +134,263 @@ That is why **128 wins**. It is large enough to chase the sine, but small enough
 
 ---
 
-## Run it your way
+## Run it anywhere — choose your path
 
-### Path A — simulate and plot
+| You have... | Best path | What you get |
+|---|---|---|
+| Only a laptop | **Icarus Verilog** | Portable simulation, VCD waveform, and CSV data on Windows/Linux/macOS. |
+| Vivado, but no board | **Vivado behavioral simulation** | XSIM waveforms and the exact project configuration used for the FPGA build. |
+| Vivado + ZedBoard | **Hardware demo** | LEDs, raw Pmod stream, RC-filtered reconstruction, and ILA capture. |
+| Vitis + ZedBoard | **Cortex-A9 model** | UART CSV/SNR comparison from the Zynq processing system. |
 
-Best when you want fast waveforms, CSV data, and graphs.
+> **Start here if you downloaded `FPGA.zip`:** extract it, open a terminal in the extracted project folder, and follow Path A. No board or Vivado installation is needed for the portable simulation.
 
-```text
-Vivado → Open DCS/delta/delta.xpr
-       → Run Behavioral Simulation
-       → Run All
-       → inspect waveform + dm_out.csv
+### 0. Get a clean copy
+
+#### Option 1 — clone from GitHub
+
+```bash
+git clone https://github.com/Mithunjagan/DCS_DM.git
+cd DCS_DM
 ```
 
-The testbench captures 4096 samples and writes:
+#### Option 2 — use the ZIP file
+
+1. Extract `FPGA.zip` to a folder with write permission, for example `C:\Projects\DCS_DM` or `~/Projects/DCS_DM`.
+2. Open PowerShell, Command Prompt, or a terminal **at the folder containing `README.md`**.
+3. Confirm that `DCS/tb_dm.v` exists before running a simulator.
+
+---
+
+### Path A — run the design on Windows, Linux, or macOS with Icarus Verilog
+
+This is the most portable route. It tests the actual encoder, decoder, sine source, and CSV-writing testbench. It does not require Vivado, a license, or the ZedBoard.
+
+#### A.1 Install the simulator
+
+Install [Icarus Verilog](https://steveicarus.github.io/iverilog/) so both `iverilog` and `vvp` are available on your terminal path.
+
+| Operating system | Typical installation method |
+|---|---|
+| Windows | Install Icarus Verilog and reopen PowerShell. Verify with `iverilog -V`. |
+| Ubuntu/Debian | `sudo apt install iverilog` |
+| Fedora | `sudo dnf install iverilog` |
+| macOS | `brew install icarus-verilog` |
+
+#### A.2 Compile and run — PowerShell on Windows
+
+Run the included script from the repository root:
+
+```powershell
+.\scripts\run_icarus.ps1 -Delta 128 -Samples 4096
+```
+
+If Windows blocks local PowerShell scripts because of its execution policy, use this one-time invocation instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_icarus.ps1 -Delta 128 -Samples 4096
+```
+
+For a manual compile, use:
+
+```powershell
+New-Item -ItemType Directory -Force build\sim | Out-Null
+Push-Location build\sim
+iverilog -g2012 -s tb_dm -Ptb_dm.DELTA=128 -Ptb_dm.N=4096 -o tb_dm.vvp `
+  ..\..\DCS\sine_gen.v `
+  ..\..\DCS\delta_modulator.v `
+  ..\..\DCS\delta_demodulator.v `
+  ..\..\DCS\tb_dm.v
+vvp .\tb_dm.vvp
+Pop-Location
+```
+
+#### A.3 Compile and run — Linux/macOS shell
+
+Run the included portable script from the repository root:
+
+```bash
+sh ./scripts/run_icarus.sh 128 4096
+```
+
+The first argument is the delta step; the optional second argument is the sample count. For example, run the granular-noise case with:
+
+```bash
+sh ./scripts/run_icarus.sh 512 8192
+```
+
+For a manual compile, use:
+
+```bash
+mkdir -p build/sim
+cd build/sim
+iverilog -g2012 -s tb_dm -Ptb_dm.DELTA=128 -Ptb_dm.N=4096 -o tb_dm.vvp \
+  ../../DCS/sine_gen.v \
+  ../../DCS/delta_modulator.v \
+  ../../DCS/delta_demodulator.v \
+  ../../DCS/tb_dm.v
+vvp tb_dm.vvp
+cd ../..
+```
+
+#### A.4 Confirm success
+
+The simulator should print a completion message similar to:
+
+```text
+TB done: 4096 samples written to dm_out.csv (delta=128)
+```
+
+You should now have these two files in `build/sim/`:
+
+```text
+dm_out.csv   ← open in Excel, Python, MATLAB, or LibreOffice Calc
+tb_dm.vcd    ← open with GTKWave or another VCD viewer
+```
+
+The CSV columns are:
 
 ```text
 n,input,encoder_staircase,dm_bit,decoder_staircase,decoder_filtered,error
 ```
 
-Try `DELTA = 16, 64, 128, 512` in `DCS/tb_dm.v` and plot the difference. It is the fastest way to build a compelling result figure for a report or presentation.
+#### A.5 Create your own result figures
 
-### Path B — program the board
+1. Run the script once for each supported delta value; no HDL edit is needed:
 
-Best when you want the live “wow” moment.
+   ```powershell
+   .\scripts\run_icarus.ps1 -Delta 16
+   .\scripts\run_icarus.ps1 -Delta 64
+   .\scripts\run_icarus.ps1 -Delta 128
+   .\scripts\run_icarus.ps1 -Delta 512
+   ```
 
-```text
-Vivado → Open DCS/delta/delta.xpr
-       → Generate Bitstream
-       → Hardware Manager
-       → Program Device
-```
+   ```bash
+   sh ./scripts/run_icarus.sh 16
+   sh ./scripts/run_icarus.sh 64
+   sh ./scripts/run_icarus.sh 128
+   sh ./scripts/run_icarus.sh 512
+   ```
 
-The generated release image is already available here:
+2. Each runner creates a separate folder: `build/sim/delta-16/`, `delta-64/`, `delta-128/`, or `delta-512/`.
+3. Plot `input`, `encoder_staircase`, and `decoder_filtered` against `n`.
+4. Plot `error` separately, or compare the density and consecutive-run lengths of `dm_bit = 0/1` values.
 
-```text
-DCS/delta/delta.runs/impl_1/dm_top.bit
-```
+> The testbench is intentionally independent of the board top level. `DCS/bufg_stub.v` is only needed when simulating a design that instantiates the Xilinx `BUFG` primitive; it is **not** part of the command above.
 
-Connect JB2 through a **1 kΩ series resistor** and **100 nF capacitor to ground**. Probe across the capacitor to view the reconstructed waveform safely on a scope.
+---
 
-### Path C — explore the math in software
+### Path B — run the official Vivado simulation
 
-`DCS/delta_mod.c` is a Cortex-A9 / Vitis reference model. It prints CSV and SNR values for all four delta steps over UART at `115200-8-N-1`.
+Use this path to work with the saved Xilinx project, inspect all signals in XSIM, and reproduce the workflow used to generate the supplied implementation evidence.
+
+#### B.1 Prerequisites
+
+- AMD/Xilinx Vivado **2022.2** is the matched version for the saved project artifacts.
+- Later Vivado versions can open the project, but may ask to upgrade it. If you want to preserve the original project metadata, use **Save Project As** in a separate working copy.
+
+#### B.2 Open and validate the project
+
+1. Launch Vivado.
+2. Select **File → Open Project**.
+3. Open `DCS/delta/delta.xpr` — **not** `DCS/Deltamodulation/Deltamodulation.xpr`.
+4. In the **Sources** pane, verify that the design source set contains `dm_top.v`, `sine_gen.v`, `delta_modulator.v`, and `delta_demodulator.v`.
+5. Verify that the simulation top is `tb_dm` and the design top is `dm_top`.
+6. If Vivado reports missing source files, confirm that the repository was extracted intact. The `.xpr` intentionally references the HDL files one directory above `DCS/delta/`.
+
+#### B.3 Run the behavioral simulation
+
+1. In **Flow Navigator**, choose **Run Simulation → Run Behavioral Simulation**.
+2. In XSIM, add or locate these signals: `x`, `y_enc`, `dm_bit`, `y_dec_stair`, `y_dec`, and `x - y_enc`.
+3. Click **Run All**. Do not stop after the default short waveform interval; the testbench automatically ends after 4096 samples.
+4. Confirm the `TB done` completion message in the Tcl/simulation console.
+5. Open the generated `dm_out.csv`. Vivado commonly writes it under `DCS/delta/delta.sim/sim_1/behav/xsim/` for this saved project.
+
+#### B.4 Build from HDL source
+
+1. Select **Run Synthesis** and wait for completion.
+2. Open the synthesized design and check for unintended inferred logic or missing ports.
+3. Select **Run Implementation**.
+4. Open **Report Timing Summary**; the acceptance condition is zero failing setup/hold endpoints.
+5. Run **Generate Bitstream** only after implementation completes successfully.
+6. Save the generated `.bit` and matching `.ltx` probe file together if you plan to use ILA.
+
+---
+
+### Path C — run the live ZedBoard demonstration
+
+This is the hardware path used for the presentation/demo experience.
+
+#### C.1 Hardware checklist
+
+- ZedBoard with XC7Z020-1CLG484
+- Board power supply and JTAG connection
+- Vivado Hardware Manager
+- Optional oscilloscope and Pmod jumper wires
+- Optional RC filter: **1 kΩ series resistor + 100 nF capacitor to ground**
+
+#### C.2 Validate the board voltage setting first
+
+`DCS/zedboard_dm.xdc` declares the slide switches and BTNC as `LVCMOS18`, because it assumes the ZedBoard J18 VADJ jumper is at the factory 1.8 V position.
+
+1. Power off the board.
+2. Check J18 against your ZedBoard hardware guide.
+3. If J18 is at 1.8 V, use the supplied XDC unchanged.
+4. If J18 is at 3.3 V, change **only** the BTNC and switch constraints in `DCS/zedboard_dm.xdc` from `LVCMOS18` to `LVCMOS33`, then rebuild the bitstream.
+
+Do not program the board with incompatible I/O standards.
+
+#### C.3 Program the included bitstream
+
+1. Power the ZedBoard and connect JTAG.
+2. Open `DCS/delta/delta.xpr` in Vivado.
+3. Select **Open Hardware Manager → Open Target → Auto Connect**.
+4. Select **Program Device**.
+5. Choose `DCS/delta/delta.runs/impl_1/dm_top.bit`.
+6. If Vivado asks for debug probes, choose the matching `DCS/delta/delta.runs/impl_1/dm_top.ltx`.
+7. Program the device and wait for success confirmation.
+
+#### C.4 Run the demo
+
+1. Press **BTNC** to reset the codec.
+2. Set `SW1:SW0 = 10` for `delta = 128`.
+3. Observe the LED pattern changing as the reconstructed signal changes.
+4. Probe **Pmod JB1** for the raw 500 kbit/s DM stream.
+5. Connect **Pmod JB2 → 1 kΩ resistor → measurement node**. Connect a **100 nF capacitor from that node to GND**. Probe the measurement node to see the filtered reconstruction.
+6. Change to `00`, `01`, and `11`; record the effect in the ILA/scope capture.
+
+#### C.5 Capture internal signals with ILA
+
+1. In Hardware Manager, locate the ILA dashboard after programming the matching `.bit`/`.ltx` pair.
+2. Use `dbg_bit` or an input zero-crossing as a trigger.
+3. Capture `dbg_x`, `dbg_yenc`, `dbg_ydec`, `dbg_err`, and `dbg_bit`.
+4. Export or screenshot the trace for your report. Capture one screenshot for `delta=128`, one for slope overload, and one for granular noise.
+
+---
+
+### Path D — run the Zynq Cortex-A9 reference model
+
+This path does not use the FPGA logic. It is a numerical/software reference that prints the same core experiment as CSV over UART.
+
+1. Install/open AMD/Xilinx Vitis with a Zynq standalone/BSP platform for the ZedBoard.
+2. Create a standalone application project, for example from the `hello_world` template.
+3. Replace the template C source with `DCS/delta_mod.c`.
+4. Build the application. The source requires the Xilinx BSP headers and the math library supplied by the Vitis standalone environment.
+5. Run it on the Cortex-A9 processor.
+6. Open a USB-UART terminal at **115200 baud, 8 data bits, no parity, 1 stop bit**.
+7. Capture the four CSV blocks (`delta = 16, 64, 128, 512`) and their printed SNR values.
+
+### Fast troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `iverilog` is not recognized | Simulator is not installed or not on `PATH`. | Install Icarus Verilog, reopen the terminal, and run `iverilog -V`. |
+| No `dm_out.csv` | The simulation did not reach `$finish`, or it was run from another working folder. | Use `Run All`/`vvp`, then search the simulator working directory. |
+| Vivado cannot find HDL files | The folder hierarchy changed after extraction. | Keep `DCS/delta/delta.xpr` directly beneath `DCS/` with the HDL files in `DCS/`. |
+| LEDs do not behave as expected | Incorrect switch mode or reset state. | Press BTNC, then begin with `SW1:SW0 = 10`. |
+| No scope reconstruction on JB2 | No RC filter, incorrect ground, or probing before the capacitor. | Use the documented 1 kΩ/100 nF network and common ground. |
+| ILA is missing | `.ltx` probes do not match the bitstream. | Program the committed `dm_top.bit` and matching `dm_top.ltx` together, or regenerate both. |
+| Input switches misbehave | J18 voltage and XDC I/O standard do not match. | Recheck the board jumper and `LVCMOS18`/`LVCMOS33` setting. |
 
 ---
 
@@ -231,6 +445,58 @@ No reproducible evidence              →    CSV, timing, utilization, power, DR
 ```
 
 This is not presented as a new modulation algorithm. Its strength is **turning a classic communications concept into an honest, debuggable, board-level demonstration**.
+
+---
+
+## Research gap and novelty — stated honestly
+
+### What established work already shows
+
+This repository does **not** claim that Delta Modulation, FPGA-based modulation, or adaptive step-size modulation was invented here.
+
+- Linear Delta Modulation has long-established slope-overload and granular-noise limits. Adaptive Delta Modulation was already studied as a way to change step size dynamically; for example, Boyce’s 1976 analysis examines the step response and stability of an adaptive scheme based on earlier work by Jayant. [Read the primary publication](https://doi.org/10.1002/j.1538-7305.tb02888.x).
+- FPGA-based communications trainer systems have also been demonstrated before. A published trainer implementation includes Delta Modulation among several analogue/digital modulation methods and uses FPGA-generated signals for instructional observation. [Read the trainer-system paper](https://archium.ateneo.edu/discs-faculty-pubs/196/).
+
+So, saying “the first FPGA Delta Modulator” or “a novel Delta Modulation algorithm” would be inaccurate.
+
+### The practical gap this project addresses
+
+Based on the comparison above, the gap addressed here is a **reproducible, single-purpose, board-level learning and verification benchmark** for *fixed-step* Delta Modulation. Existing work establishes the theory, adaptive variants, and broad telecommunications trainers; this repository focuses the entire workflow on one question:
+
+> **How does a theoretically chosen fixed step move a one-bit codec between slope overload, correct tracking, and granular noise — and how can that transition be verified from RTL to a physical pin?**
+
+The repository closes that practical gap by keeping the calculation, RTL, switch-controlled experiment, waveform data, physical outputs, ILA probes, bitstream, and implementation reports together in one versioned project.
+
+### What is novel about this implementation
+
+The novelty is **system and experimental novelty**, not a new coding equation:
+
+| Contribution | Why it matters |
+|---|---|
+| Theory-driven four-mode experiment | The switch settings are not arbitrary: `16`, `64`, `128`, and `512` deliberately bracket the calculated minimum step of `102.94`. |
+| One design, three visible outcomes | The same programmed board can deliberately show severe overload, mild overload, nominal tracking, and granular noise without changing HDL. |
+| Dual-plane observability | The project observes the codec internally through ILA and externally through LEDs, raw Pmod bits, and RC-filtered PDM output. |
+| Reproducible evidence bundle | Source, project file, constraints, bitstream, ILA probes, simulation CSV, timing, utilization, power, route, and DRC reports are retained together. |
+| Portable entry point | A user without Vivado or hardware can still execute the real codec testbench using Icarus Verilog and obtain CSV/VCD evidence. |
+| PS/PL teaching bridge | The optional Cortex-A9 reference model makes it possible to compare HDL behavior with a software-generated numerical experiment. |
+
+### Research questions this project can answer
+
+1. Does the measured/simulated transition from overload to tracking occur near the slope-based step-size prediction?
+2. How do bit-run length, tracking error, and reconstruction quality change across the four fixed delta values?
+3. How much of the staircase/granular component is reduced by the first-order IIR filter, and what delay does that filtering introduce?
+4. Can an independently run simulation, a Vivado implementation report, ILA capture, and physical Pmod observation tell a consistent story?
+
+### Claims you should and should not make in a paper
+
+| Safe, evidence-backed claim | Do **not** claim without new comparative research |
+|---|---|
+| “We implemented and verified a fixed-step Delta Modulation demonstrator on ZedBoard.” | “We invented Delta Modulation.” |
+| “The selectable step values demonstrate slope overload and granular noise.” | “This is the first FPGA Delta Modulator.” |
+| “The nominal 128-count setting satisfies this project’s derived slope condition.” | “The design is universally optimal for all inputs.” |
+| “The project improves visibility and reproducibility for an educational experiment.” | “It outperforms adaptive DM, PCM, or commercial codecs.” |
+
+> **A strong research-paper framing:** *This work contributes a reproducible FPGA experimental platform for validating fixed-step Delta Modulation trade-offs through synchronized theory, simulation, implementation evidence, internal debug capture, and physical observation.*
 
 ---
 

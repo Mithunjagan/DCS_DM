@@ -21,6 +21,23 @@ Conventional pulse-code modulation transmits multiple quantized bits for every s
 
 The simplicity has a cost. If the input waveform changes faster than the staircase can move, the encoder suffers **slope overload**. If the step is unnecessarily large while the input varies slowly, the staircase hunts around the desired value and produces **granular noise**. The present project turns both limitations into visible experimental modes, rather than hiding them in a purely theoretical simulation.
 
+### 1.1 Research gap and contribution
+
+This work does not claim to introduce Delta Modulation, FPGA-based modulation, or adaptive Delta Modulation as new concepts. Linear Delta Modulation, its overload/granularity limitations, and adaptive variants are established areas of communication-system research. For example, Boyce analysed the step response and stability of an adaptive Delta Modulator in 1976, while FPGA telecommunications trainers have previously incorporated Delta Modulation among many modulation methods.
+
+The gap targeted in this work is practical and educational: a **reproducible, single-purpose FPGA benchmark** that lets a user connect the slope-overload calculation to a controlled board-level experiment. In the same implementation, the user can select four theory-driven fixed steps, reproduce the effects in an HDL simulator, inspect the internal signals through an ILA, observe the physical one-bit stream at a Pmod connector, and examine versioned timing/utilization/DRC evidence.
+
+Accordingly, the contribution is system and experimental novelty rather than a new coding equation:
+
+1. The four selectable steps deliberately bracket the calculated minimum step of 102.94 for the chosen sine-wave condition.
+2. One programmed design demonstrates severe overload, mild overload, nominal tracking, and granular noise without HDL modification.
+3. The design offers synchronized digital observation (CSV/VCD and ILA) and physical observation (LED/Pmod/RC-filter output).
+4. It supports both a portable HDL simulation path and an optional Cortex-A9 software reference model.
+
+This framing should be used in the final paper. Claims such as “first FPGA Delta Modulator,” “novel Delta Modulation algorithm,” or “better than adaptive Delta Modulation” are not supported by this project and should not be made without a new comparative study.
+
+**Research-positioning references:** W. M. Boyce, “[Step Response of an Adaptive Delta Modulator](https://doi.org/10.1002/j.1538-7305.tb02888.x),” *Bell System Technical Journal*, vol. 55, pp. 373–393, 1976; C. Oppus et al., “[FPGA Implementation of a Telecommunications Trainer System](https://archium.ateneo.edu/discs-faculty-pubs/196/),” *International Journal of Circuits, Systems and Signal Processing*, vol. 2, no. 1, pp. 87–94, 2008.
+
 ## 2. Aim
 
 To implement and experimentally study a complete one-bit delta modulation and demodulation system on the ZedBoard FPGA, with selectable step size and hardware-visible output.
