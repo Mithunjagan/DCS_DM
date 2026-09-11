@@ -1,0 +1,36 @@
+# Xilinx Vivado generated caches, temporary state, and logs
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
+*.runs/
+.Xil/
+*.Xil/
+*.jou
+*.log
+*.pb
+*.wdf
+*.wpc
+*.dcp
+*.vds
+*.vdi
+*.rpx
+*.wdb
+*.xml
+*.lpr
+*.str
+*.tmp
+
+# HDL simulator by-products
+*.vcd
+*.sdb
+*.rlx
+*.rtti
+*.reloc
+*.mem
+*.dbg
+*.obj
+*.exe
+
+# Keep source, constraints, Vivado project definitions, documentation,
+# and explicitly staged release evidence (bitstream, probes, reports, CSV).
