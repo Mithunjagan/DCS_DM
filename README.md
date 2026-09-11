@@ -1,4 +1,4 @@
-# One Bit. Real Signal. Full FPGA. ⚡
+# FPGA-Based Delta Modulation and Demodulation System on ZedBoard ⚡
 
 <p align="center">
   <strong>A live Delta Modulation lab on the ZedBoard — built to be seen, measured, and explained.</strong><br>
